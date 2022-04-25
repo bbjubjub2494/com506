@@ -1,4 +1,6 @@
-# This is Florian Picca's solution
+#!/usr/bin/env sage
+
+# Based on Florian Picca's solution
 # https://blog.oppida.apave.com/en/Nos-articles/Google-CTF-2021-Pythia
 
 import pickle
@@ -36,9 +38,9 @@ def multi_collide_gcm(keyset, nonce, tag):
     C_blocks = [GH_to_bytes(c) for c in sol.list()[::-1]]
     return b''.join(C_blocks) + tag
 
-# cache the results for speedup, could have precomputed them but it's not that slow
-@functools.lru_cache(maxsize=None)
 def forge(start, end):
+    if (start, end) in forge_precompute:
+        return forge_precompute[start, end]
     keyset = list(keys.keys())[start:end]
     r = multi_collide_gcm(keyset, b'\x00'*12, b'\x01'*16)
     return r
@@ -98,10 +100,18 @@ if __name__ == "__main__":
     B = 500
     nonce = base64.b64encode(b'\x00' * 12)
 
+    try:
+        forge_precompute = pickle.load(open("forge_precompute.pickle", "rb"))
+    except FileNotFoundError:
+        forge_precompute = {}
+        print("Precomputing...")
+        for i in range(0, N, B):
+            keyset = list(keys.keys())[i:i+B]
+            forge_precompute[i, i+ B] = multi_collide_gcm(keyset, b'\x00'*12, b'\x01'*16)
+        pickle.dump(forge_precompute, open("forge_precompute.pickle", "wb"))
+
     # recover the passwords and get the flag
-    conn = remote("pythia.2021.ctfcompetition.com", 1337)
-    # local testing
-    # conn = process("./pythia.py")
+    conn = remote("pythia.2021.ctfcompetition.com", 1337) if args.REMOTE else process("game.sage")
     conn.recvuntil(b">>> ")
 
     password = b''

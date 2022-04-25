@@ -1,3 +1,5 @@
+#!/usr/bin/env sage
+
 # This is the Pythia challenge from GoogleCTF 2021
 
 import random
@@ -48,8 +50,6 @@ for query in range(max_queries):
         passwd = bytes(input(">>> "), 'UTF-8')
 
         print("Checking...")
-        # Prevent bruteforce attacks...
-        time.sleep(query_delay)
         if passwd == (passwords[0] + passwords[1] + passwords[2]):
             print("ACCESS GRANTED: " + flag.decode('UTF-8'))
         else:
@@ -59,8 +59,6 @@ for query in range(max_queries):
 
         ct = input(">>> ")
         print("Decrypting...")
-        # Prevent bruteforce attacks...
-        time.sleep(query_delay)
         try:
             nonce, ciphertext = ct.split(",")
             nonce = b64decode(nonce)
