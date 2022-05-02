@@ -1,4 +1,4 @@
-\documentclass[9pt, sans, a4paper]{article}
+\documentclass[9pt, a4paper]{article}
 \usepackage[margin=3.5cm]{geometry}
 \usepackage{hyperref}
 \usepackage{fancyhdr}
@@ -8,6 +8,7 @@
 \usepackage[oldstyle]{libertinus}
 % For all the math symbols we might need.
 \usepackage{unicode-math}
+% For the math environments
 \usepackage{amsmath}
 % For moving the title up
 \usepackage{titling}
@@ -29,8 +30,148 @@
 
 \section{Introduction}
 
-This is a citation.\cite{partitioning}
+When communicating over the Internet nowadays,
+cryptography is almost always used to protect messages
+in such an insecure environment.
+It is therefore in Internet users' interest that
+the cryptographic primitives used resist
+known and unknown attacks as much as possible,
+no matter how clever or powerful the adversary might be.
+One such cryptographic primitive is AES-GCM\cite{aes-gcm},
+a symmetric cipher that provides authenticated encryption.
 
-\bibliographystyle{alpha}
+A recent paper\cite{partitioning}
+presents a practical attack against AES-GCM
+that can lead to key recovery if AES-GCM is used on a public facing server.
+The authors also provide insight on the theory behind their finding, 
+its implications for similar cryptographic primitives,
+and ways to remedy it in the short and long term.
+
+\section{Abstract description}
+\subsection{From brute force to partitioning}
+To approach the concept of partitioning oracle attacks,
+we will compare them to brute force attacks.
+Brute force for our purposes, means
+trying every possible long-term key one-by-one.
+This requires a way to test if the current guess matches the real key.
+We model that as an \emph{oracle}: an opaque box that tells us if it's correct, and nothing more.
+
+Now suppose there is a way to mix $k$ keys together
+to learn if the real key is amongst them or not,
+for an arbitrary $k \geq 1$.
+Despite being a small change in the problem,
+this can make it exponentially easier to solve
+using a binary search algorithm.
+The oracle for this process is a \emph{partitioning} oracle since it acts on a partition of the keyspace.
+
+\subsection{Multi-Key Collision Resistance}
+Multi-key collision resistance (MKCR) is a property that AEAD ciphers can possess.
+A cipher lacks resistance if a PPT adversary given $k \geq 1$ can produce a \emph{splitting} ciphertext $C$ and a set of $k$ keys $\mathcal K$ such that the ciphertext decrypts under all keys in $\mathcal K$ with non-negligible probability.
+
+Targeted multi-key collision resistance (TMKCR) is a weaker property: the adversary is given $\mathcal K$ and must produce a ciphertext $C$ that decrypts under every $K \in \mathcal K$.
+A MKCR cipher is also TMKCR, but the converse is not true.
+
+MKCR AEAD ciphers can be called \emph{robust} or \emph{key-committing}.
+
+The method to generate multi-key ciphertexts in polynomial time
+and/or in a way that is practical
+depends on the specific cipher in-use.
+We will evaluate the resistance of well-known AEAD ciphers
+in the next section.
+
+
+\section{Concrete collision}
+\subsection{AES-GCM}
+In the case of AES-GCM
+targeted multi-key collisions can be produced using polynomial interpolation.
+In fact, AES-GCM generates a MAC by evaluating
+\begin{equation}
+	h =
+	C_1 \cdot H^{m+1}
+	\oplus
+	...
+	\oplus
+	C_{m-1} \cdot H^3
+	\oplus
+	C_m \cdot H^2
+	\oplus
+	L \cdot H
+	\label{auth}
+\end{equation}
+where
+$H$ is the AES encryption of the all-zero block with the shared key,
+$C_{1..m}$ are the blocks of the ciphertext,
+$L$ encodes the length of the ciphertext.
+The symbol $\cdot$ and the exponents denote multiplication in $GF(2^{128})/(x^{128} + x^7 + x^2 +x +1)$.
+This allows generating targeted multi-key collision for $k$ keys $K_{1...k}$ by solving for $C_{1...k}$ in the following system:
+\begin{equation}
+\begin{pmatrix}
+	1 & H_1 & H_1^2 & \cdots & H_1^{k-1}
+	\\
+	1 & H_2 & H_2^2 & \cdots & H_2^{k-1}
+	\\
+	\vdots & \vdots & \vdots & \ddots & \vdots
+	\\
+	1 & H_k & H_k^2 & \cdots & H_k^{k-1}
+\end{pmatrix}
+\cdot
+\begin{pmatrix}
+	C_k
+	\\
+	C_{k-1}
+	\\
+	\vdots
+	\\
+	C_1
+\end{pmatrix}
+=
+\begin{pmatrix}
+	B_1
+	\\
+	B_2
+	\\
+	\vdots
+	\\
+	B_k
+\end{pmatrix}
+\end{equation}
+where
+$H_i = E_{K_i}(0^{128})$
+,
+$B_i = (L \cdot H_i \oplus E_{K_i}(IV \parallel 0^{31} \parallel 1) \oplus T) \cdot H_i^{-2}$.
+,
+IV is a 96-bit nonce
+and
+$T$ is arbitrary.
+Since the matrix is a Vandermonde matrix, it can be inverted is $O(k^2)$, which makes the algorithm more efficient.
+In this way, $IV$, $T$ and $C_{1...k}$ form a valid ciphertext for which equation \ref{auth} will hold under any key in $K_{1...k}$, and for any other key only with negligible probability.
+This fits the definition of a targeted multi-key collision.
+
+We note that the length of the splitting ciphertext is proportional to $k$.
+
+\subsection{AES-GCM-SIV}
+AES-GCM-SIV is a cipher similar to AES-GCM that is designed to mitigate nonce-reuse.
+It is not designed to be a key-committing AEAD cipher.
+Despite that, the authors have found \emph{non-targeted} multi-key collision attacks on AES-GCM-SIV
+using polynomial interpolation. With AES-GCM, those could be targeted collisions.
+
+\subsection{Poly1305}
+AEAD ciphers such as Chacha20-Poly1305 use a similar algebraic construct to generate MACs.
+The algorithm however operates in $GF(2^{130}-5)$, and has some additional subtleties that make it much harder to implement multi-key collision attacks.
+The authors were unable to produce collisions with $k$ higher than 10. This does not prove that this family of cipher are key-committing.
+
+\section{Real-world attack}
+Shadowsocks\cite{shadowsocks} is a TCP and UDP proxy protocol that can use AES-GCM.
+It can be configured to use symmetric keys derived from a password.
+The authors discovered that it was possible to send a splitting ciphertext as a
+UDP packet to be forwarded and observe whether the server accepted it or not with port scanning.
+This creates a partitioning oracle that allows testing up to 4091 passwords at once due to a limit on the size of the splitting ciphertext.
+The authors showed in a simulation that,
+compared to a 1-by-1 online password guessing attack,
+the partitioning oracle attack had a higher success rate and consumed less bandwidth despite the size of the packets.
+
+The authors recommend that robust AEAD ciphers be standardized and made available to application developers so that these kinds of attacks do not occur. The algorithms should be efficient in order to maximize adoption. according to them, key-committing AEAD should be the default.
+
+\bibliographystyle{IEEEtran}
 \footnotesize \bibliography{bib}
 \end{document}
