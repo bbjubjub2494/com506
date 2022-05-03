@@ -134,11 +134,7 @@ if __name__ == "__main__":
             tries -= 1
             print(f"tries left : {tries}")
     print(f"full password = {password.decode()}")
-    conn.sendline(b"2")
-    conn.recvuntil(b">>> ")
-    conn.sendline(password)
-    conn.recvuntil(b"ACCESS GRANTED: ")
-    print(f"Flag : {conn.recvline().decode()}")
+    conn.interactive()
     conn.close()
 
 
