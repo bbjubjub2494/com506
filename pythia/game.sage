@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 
 max_queries = 150
-query_delay = 10
+query_delay = float('0.1') # seconds
 
 passwords = [bytes(''.join(random.choice(string.ascii_lowercase) for _ in range(3)), 'UTF-8') for _ in range(3)]
 flag = open("flag.txt", "rb").read()
@@ -50,6 +50,8 @@ for query in range(max_queries):
         passwd = bytes(input(">>> "), 'UTF-8')
 
         print("Checking...")
+        # Prevent bruteforce attacks...
+        time.sleep(query_delay)
         if passwd == (passwords[0] + passwords[1] + passwords[2]):
             print("ACCESS GRANTED: " + flag.decode('UTF-8'))
         else:
@@ -59,6 +61,8 @@ for query in range(max_queries):
 
         ct = input(">>> ")
         print("Decrypting...")
+        # Prevent bruteforce attacks...
+        time.sleep(query_delay)
         try:
             nonce, ciphertext = ct.split(",")
             nonce = b64decode(nonce)
