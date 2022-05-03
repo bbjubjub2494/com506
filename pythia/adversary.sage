@@ -16,6 +16,11 @@ from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 from cryptography.hazmat.backends import default_backend
 from bitstring import BitArray
 
+P = PolynomialRing(GF(2), "x")
+x = P.gen()
+p = x ** 128 + x ** 7 + x ** 2 + x + 1
+GH = GF(2 ** 128, "a", modulus=p)
+
 def bytes_to_GH(data):
     """Simply convert bytes to field elements"""
     return GH([int(v) for v in BitArray(data).bin])
@@ -38,6 +43,7 @@ def multi_collide_gcm(keyset, nonce, tag):
     C_blocks = [GH_to_bytes(c) for c in sol.list()[::-1]]
     return b''.join(C_blocks) + tag
 
+forge_precompute = {}
 def forge(start, end):
     if (start, end) in forge_precompute:
         return forge_precompute[start, end]
@@ -89,12 +95,6 @@ if __name__ == "__main__":
             keys[kdf.derive(pwd)] = pwd
         pickle.dump(keys, open("keys.pickle", "wb"))
 
-    # global variables
-    P = PolynomialRing(GF(2), "x")
-    x = P.gen()
-    p = x ** 128 + x ** 7 + x ** 2 + x + 1
-    GH = GF(2 ** 128, "a", modulus=p)
-
     tries = 150
     N = 26**3
     B = 500
@@ -103,7 +103,6 @@ if __name__ == "__main__":
     try:
         forge_precompute = pickle.load(open("forge_precompute.pickle", "rb"))
     except FileNotFoundError:
-        forge_precompute = {}
         print("Precomputing...")
         for i in range(0, N, B):
             keyset = list(keys.keys())[i:i+B]
