@@ -148,6 +148,12 @@ In this way, $IV$, $T$ and $C_{1...k}$ form a valid ciphertext for which equatio
 This fits the definition of a targeted multi-key collision.
 
 We note that the length of the splitting ciphertext is proportional to $k$.
+This is important because
+if the key is distributed uniformly in $\{0,1\}^{128}$,
+we need to send about $2^{128}$ AES blocks through the oracle.
+Thus, this attack is not practical in that case.
+If the key is derived from a human-selected password however,
+attacks are feasible as we will see.
 
 \subsection{AES-GCM-SIV}
 AES-GCM-SIV is a cipher similar to AES-GCM that is designed to mitigate nonce-reuse.
