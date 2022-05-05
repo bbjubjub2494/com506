@@ -68,7 +68,7 @@ The oracle for this process is a \emph{partitioning} oracle since it acts on a p
 Multi-key collision resistance (MKCR) is a property that AEAD ciphers can possess.
 A cipher lacks resistance if a PPT adversary given $k \geq 1$ can produce a \emph{splitting} ciphertext $C$ and a set of $k$ keys $\mathcal K$ such that the ciphertext decrypts under all keys in $\mathcal K$ with non-negligible probability.
 
-Targeted multi-key collision resistance (TMKCR) is a weaker property: the adversary is given $\mathcal K$ and must produce a ciphertext $C$ that decrypts under every $K \in \mathcal K$.
+Targeted multi-key collision resistance (TMKCR) is a weaker property: the adversary is given $\mathcal K$ and must produce a ciphertext $C$ that decrypts under every key in $\mathcal K$.
 A MKCR cipher is also TMKCR, but the converse is not true.
 
 MKCR AEAD ciphers can be called \emph{robust} or \emph{key-committing}.
@@ -84,9 +84,9 @@ in the next section.
 \subsection{AES-GCM}
 In the case of AES-GCM
 targeted multi-key collisions can be produced using polynomial interpolation.
-In fact, AES-GCM generates a MAC by evaluating
+In fact, AES-GCM generates an authentication tag by evaluating
 \begin{equation}
-	h =
+	T =
 	C_1 \cdot H^{m+1}
 	\oplus
 	...
@@ -143,7 +143,7 @@ $B_i = (L \cdot H_i \oplus E_{K_i}(IV \parallel 0^{31} \parallel 1) \oplus T) \c
 IV is a 96-bit nonce
 and
 $T$ is arbitrary.
-Since the matrix is a Vandermonde matrix, it can be inverted is $O(k^2)$, which makes the algorithm more efficient.
+Since the matrix is a Vandermonde matrix, it can be inverted in $O(k^2)$, which makes the algorithm more efficient.
 In this way, $IV$, $T$ and $C_{1...k}$ form a valid ciphertext for which equation \ref{auth} will hold under any key in $K_{1...k}$, and for any other key only with negligible probability.
 This fits the definition of a targeted multi-key collision.
 
@@ -164,17 +164,30 @@ using polynomial interpolation. With AES-GCM, those could be targeted collisions
 \subsection{Poly1305}
 AEAD ciphers such as Chacha20-Poly1305 use a similar algebraic construct to generate MACs.
 The algorithm however operates in $GF(2^{130}-5)$, and has some additional subtleties that make it much harder to implement multi-key collision attacks.
-The authors were unable to produce collisions with $k$ higher than 10. This does not prove that this family of cipher are key-committing.
+The authors were unable to produce splitting ciphertexts valid under more than 10 different keys. However, this does not prove that this family of cipher are key-committing.
 
 \section{Real-world attack}
 Shadowsocks\cite{shadowsocks} is a TCP and UDP proxy protocol that can use AES-GCM.
-It can be configured to use symmetric keys derived from a password.
+It can be configured to use keys derived from a password.
+Each packet starts with a random salt.
+That salt is passed along with the password to a HKDF,
+and the output is used as a symmetric cipher key.
+
 The authors discovered that it was possible to send a splitting ciphertext as a
-UDP packet to be forwarded and observe whether the server accepted it or not with port scanning.
-This creates a partitioning oracle that allows testing up to 4091 passwords at once due to a limit on the size of the splitting ciphertext.
-The authors showed in a simulation that,
+UDP packet to be forwarded and observe whether the server accepted it or not.
+The attacker can send the splitting ciphertext as a UDP packet to be relayed,
+and spoof a response on the server's ephemeral UDP ports.
+If ciphertext is valid, the server expected a response and will relay it to the attacker.
+This creates a partitioning oracle.
+
+A splitting ciphertext can only target up to 4091 passwords at once because the size of UDP packets is limited.
+Despite that,
+the authors showed in a simulation that,
 compared to a 1-by-1 online password guessing attack,
-the partitioning oracle attack had a higher success rate and consumed less bandwidth despite the size of the packets.
+the partitioning oracle attack had a significantly higher success rate and consumed less bandwidth despite the size of the packets.
+
+After being informed of the problem,
+Shadowsocks contributors disabled UDP functionality by default.
 
 \section{Possible mitigations}
 The authors recommend that robust AEAD ciphers be standardized and made available to application developers so that these kinds of attacks do not occur. The algorithms should be efficient in order to maximize adoption. according to them, key-committing AEAD should be the default.
