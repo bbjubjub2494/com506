@@ -176,7 +176,22 @@ The authors showed in a simulation that,
 compared to a 1-by-1 online password guessing attack,
 the partitioning oracle attack had a higher success rate and consumed less bandwidth despite the size of the packets.
 
+\section{Possible mitigations}
 The authors recommend that robust AEAD ciphers be standardized and made available to application developers so that these kinds of attacks do not occur. The algorithms should be efficient in order to maximize adoption. according to them, key-committing AEAD should be the default.
+
+In the shorter term, applications that combine passwords and AEAD may need to adopt mitigations.
+One possible mitigation is
+limiting the size of acceptable ciphertexts.
+Of course this is not possible for every application,
+but it is the approach chosen by the age file encryption tool.
+\footnote{\url{https://github.com/FiloSottile/age/commit/2194f69}}
+
+Another available mitigation is
+to use synchronous password-authenticated key exchange protocols.
+This is only possible in interactive contexts
+and requires a PAKE protocol that resists partitioning oracle attacks.
+The authors examine well-known PAKE protocols and show that some are safe and some are vulnerable.
+Shadowsocks could implement this mitigation at the cost of backwards-compatibility.
 
 \bibliographystyle{IEEEtran}
 \footnotesize \bibliography{bib}
