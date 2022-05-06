@@ -87,3 +87,5 @@ for query in range(max_queries):
     else:
         print("Invalid option!")
     print("You have " + str(max_queries - query) + " trials left...\n")
+
+# vim: filetype=python:
