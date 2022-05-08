@@ -45,6 +45,7 @@ def multi_collide_gcm(keyset, nonce, tag):
 
 forge_precompute = {}
 def forge(start, end):
+    log.info("making a splitting ciphertext (k=%d)", end-start)
     if (start, end) in forge_precompute:
         return forge_precompute[start, end]
     keyset = list(keys.keys())[start:end]
@@ -75,7 +76,6 @@ def bsearch(start, end):
     if end - start == 1:
         return start
     tries -= 1
-    print(f"tries left : {tries}")
     if decrypt(forge(start, mid)):
         return bsearch(start, mid)
     else:
@@ -87,10 +87,10 @@ if __name__ == "__main__":
     try:
         keys = pickle.load(open("keys.pickle", "rb"))
     except FileNotFoundError:
+        log.warning("Precomputing keys")
         keys = {}
         for t in itertools.product(string.ascii_lowercase, repeat=3):
             pwd = "".join(t).encode()
-            print(pwd)
             kdf = Scrypt(salt=b'', length=16, n=2 ** 4, r=8, p=1, backend=default_backend())
             keys[kdf.derive(pwd)] = pwd
         pickle.dump(keys, open("keys.pickle", "wb"))
@@ -103,7 +103,7 @@ if __name__ == "__main__":
     try:
         forge_precompute = pickle.load(open("forge_precompute.pickle", "rb"))
     except FileNotFoundError:
-        print("Precomputing...")
+        log.warning("Precomputing forgeries")
         for i in range(0, N, B):
             keyset = list(keys.keys())[i:i+B]
             forge_precompute[i, i+ B] = multi_collide_gcm(keyset, b'\x00'*12, b'\x01'*16)
@@ -120,18 +120,16 @@ if __name__ == "__main__":
         for i in range(0, N, B):
             # if key is in this chunk
             if decrypt(forge(i, i + B)):
-                print("Entering binary search...")
+                log.indented("Entering binary search...")
                 index = bsearch(i, i+B)
                 pwd = keys[list(keys.keys())[index]]
                 password += pwd
-                print(f"Found password : {pwd}")
+                log.info("Found password %s", pwd)
                 break
             tries -= 1
-            print(f"tries left : {tries}")
         if j < 2:
             setKey(j+1)
             tries -= 1
-            print(f"tries left : {tries}")
     print(f"full password = {password.decode()}")
     conn.interactive()
     conn.close()
